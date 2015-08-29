@@ -1,11 +1,30 @@
 var _ = require('lodash'),
     shortId = require('shortid'),
     express = require('express'),
+    session = require('express-session'),
+    cookieParser = require('cookie-parser'),
     bodyParser = require('body-parser'),
     fixtures = require('./fixtures'),
-    app = express()
+    passport = require('./auth'),
+    app = express();
 
 app.use(bodyParser.json());
+app.use(cookieParser());
+
+app.use(session({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: true
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// User Routes
+
+app.post('/api/auth/login', function(req, res) {
+  
+});
 
 app.post('/api/users', function(req, res) {
   var user = req.body.user
@@ -20,6 +39,28 @@ app.post('/api/users', function(req, res) {
   return res.sendStatus(200)
 });
 
+app.get('/api/users/:userId', function(req, res) {
+  var user = _.find(fixtures.users, { id: req.params.userId });
+
+  if (!user) {
+    return res.sendStatus(404)
+  }
+
+  return res.send({ user: user });
+});
+
+// Tweet Routes
+
+app.get('/api/tweets/:tweetId', function(req, res) {
+  var tweet = _.find(fixtures.tweets, { id: req.params.tweetId });
+
+  if (!tweet) {
+    return res.sendStatus(404)
+  }
+
+  return res.send({ tweet: tweet });
+});
+
 app.post('/api/tweets', function(req, res) {
   var tweet = req.body.tweet
 
@@ -29,14 +70,14 @@ app.post('/api/tweets', function(req, res) {
   return res.send({ tweet: tweet })
 });
 
-app.get('/api/users/:userId', function(req, res) {
-  var user = _.find(fixtures.users, { id: req.params.userId });
+app.delete('/api/tweets/:tweetId', function(req, res) {
+  var removedTweets = _.remove(fixtures.tweets, 'id', req.params.tweetId)
 
-  if (!user) {
+  if (removedTweets.length == 0) {
     return res.sendStatus(404)
   }
 
-  return res.send({ user: user });
+  return res.sendStatus(200)
 });
 
 app.get('/api/tweets', function(req, res) {
