@@ -20,10 +20,45 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+var ensureAuthenticated = function(req, res, next) {
+
+  if (req.isAuthenticated()) {
+      return next()
+  }
+
+  return res.sendStatus(403);
+}
+
+var ensureAuthorized = function(req, res, next) {
+  var tweet = _.find(fixtures.tweets, { id: req.params.tweetId });
+
+  if (req.isAuthenticated() && req.user.id === tweet.userId) {
+    return next()
+  }
+
+  return res.sendStatus(403);
+}
+
 // User Routes
 
 app.post('/api/auth/login', function(req, res) {
-  
+  passport.authenticate('local', function(err, user, info) {
+    if (err) {
+      return res.sendStatus(500);
+    }
+
+    if (!user) {
+      return res.sendStatus(403);
+    }
+
+    req.logIn(user, function(err) {
+      if (err) {
+        return res.sendStatus(500);
+      }
+
+      return res.send({ user: user });
+    });
+  })(req, res);
 });
 
 app.post('/api/users', function(req, res) {
@@ -61,16 +96,18 @@ app.get('/api/tweets/:tweetId', function(req, res) {
   return res.send({ tweet: tweet });
 });
 
-app.post('/api/tweets', function(req, res) {
+app.post('/api/tweets', ensureAuthenticated, function(req, res) {
   var tweet = req.body.tweet
 
   tweet.id = shortId.generate()
   tweet.created = Date.now() / 1000 | 0
+  tweet.userId = req.user.id
 
+  fixtures.tweets.push(tweet)
   return res.send({ tweet: tweet })
 });
 
-app.delete('/api/tweets/:tweetId', function(req, res) {
+app.delete('/api/tweets/:tweetId', ensureAuthorized, function(req, res) {
   var removedTweets = _.remove(fixtures.tweets, 'id', req.params.tweetId)
 
   if (removedTweets.length == 0) {
