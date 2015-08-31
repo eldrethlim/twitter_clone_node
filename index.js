@@ -6,7 +6,8 @@ var _ = require('lodash'),
     bodyParser = require('body-parser'),
     fixtures = require('./fixtures'),
     passport = require('./auth'),
-    config = require('./config/index.js'),
+    config = require('./config'),
+    connection = require('./db'),
     app = express();
 
 app.use(bodyParser.json());
