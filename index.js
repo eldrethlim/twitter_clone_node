@@ -6,6 +6,7 @@ var _ = require('lodash'),
     bodyParser = require('body-parser'),
     fixtures = require('./fixtures'),
     passport = require('./auth'),
+    config = require('./config/index.js'),
     app = express();
 
 app.use(bodyParser.json());
@@ -61,6 +62,11 @@ app.post('/api/auth/login', function(req, res) {
   })(req, res);
 });
 
+app.post('/api/auth/logout', function(req, res) {
+  req.logout()
+  res.sendStatus(200)
+})
+
 app.post('/api/users', function(req, res) {
   var user = req.body.user
 
@@ -71,7 +77,13 @@ app.post('/api/users', function(req, res) {
   user.followingIds = [];
   fixtures.users.push(user);
 
-  return res.sendStatus(200)
+  req.logIn(user, function(err) {
+    if (err) {
+      return res.sendStatus(500);
+    }
+
+    return res.sendStatus(200);
+  });
 });
 
 app.get('/api/users/:userId', function(req, res) {
@@ -128,6 +140,6 @@ app.get('/api/tweets', function(req, res) {
   return res.send({ tweets: sortedTweets });
 });
 
-var server = app.listen(3000, '127.0.0.1');
+var server = app.listen(config.get('server:port'), config.get('server:host'));
 
 module.exports = server;
