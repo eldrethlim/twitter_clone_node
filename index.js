@@ -8,6 +8,7 @@ var _ = require('lodash'),
     passport = require('./auth'),
     config = require('./config'),
     connection = require('./db'),
+    ObjectId = require('mongoose').Types.ObjectId,
     app = express();
 
 // Models
@@ -30,16 +31,6 @@ var ensureAuthenticated = function(req, res, next) {
 
   if (req.isAuthenticated()) {
       return next()
-  }
-
-  return res.sendStatus(403);
-}
-
-var ensureAuthorized = function(req, res, next) {
-  var tweet = _.find(fixtures.tweets, { id: req.params.tweetId });
-
-  if (req.isAuthenticated() && req.user.id === tweet.userId) {
-    return next()
   }
 
   return res.sendStatus(403);
@@ -128,7 +119,7 @@ app.get('/api/tweets/:tweetId', function(req, res) {
     if (err) {
       return res.sendStatus(500)
     }
-    
+
     if (!tweet) {
       return res.sendStatus(404)
     }
@@ -153,14 +144,35 @@ app.post('/api/tweets', ensureAuthenticated, function(req, res) {
   })
 });
 
-app.delete('/api/tweets/:tweetId', ensureAuthorized, function(req, res) {
-  var removedTweets = _.remove(fixtures.tweets, 'id', req.params.tweetId)
+app.delete('/api/tweets/:tweetId', ensureAuthenticated, function(req, res) {
 
-  if (removedTweets.length == 0) {
-    return res.sendStatus(404)
+  if (!ObjectId.isValid(req.params.tweetId)) {
+    return res.sendStatus(400)
   }
 
-  return res.sendStatus(200)
+  Tweet.findById(req.params.tweetId, function(err, tweet) {
+
+    if (err) {
+      return res.sendStatus(500)
+    }
+
+    if (!tweet) {
+      return res.sendStatus(404)
+    }
+
+    if (tweet.userId !== req.user.id) {
+      return res.sendStatus(403)
+    }
+
+    Tweet.findByIdAndRemove(tweet._id, function(err) {
+      if (err) {
+        return res.sendStatus(500)
+      }
+
+      res.sendStatus(200)
+    })
+  })
+
 });
 
 app.get('/api/tweets', function(req, res) {
@@ -168,10 +180,17 @@ app.get('/api/tweets', function(req, res) {
     return res.sendStatus(400)
   }
 
-  var tweets = _.where(fixtures.tweets, { userId: req.query.userId });
-  var sortedTweets = tweets.sort(function(a,b) { return b.created - a.created });
+  Tweet.find({ userId: req.query.userId }, null, { sort: { text: 1 } }, function(err, tweets) {
+    if (err) {
+      return res.sendStatus(500)
+    }
 
-  return res.send({ tweets: sortedTweets });
+    var responseTweets = _.map(tweets, function(t) {
+      return t.toClient()
+    });
+
+    res.send({ tweets: responseTweets })
+  })
 });
 
 var server = app.listen(config.get('server:port'), config.get('server:host'));
