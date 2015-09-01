@@ -10,6 +10,10 @@ var _ = require('lodash'),
     connection = require('./db'),
     app = express();
 
+// Models
+var User = connection.model('User'),
+    Tweet = connection.model('Tweet')
+
 app.use(bodyParser.json());
 app.use(cookieParser());
 
@@ -71,53 +75,82 @@ app.post('/api/auth/logout', function(req, res) {
 app.post('/api/users', function(req, res) {
   var user = req.body.user
 
-  if (_.find(fixtures.users, { id: user.id })) {
-    return res.sendStatus(409)
-  }
-
-  user.followingIds = [];
-  fixtures.users.push(user);
-
-  req.logIn(user, function(err) {
+  User.create(user, function(err, user) {
     if (err) {
-      return res.sendStatus(500);
+      var code = err.code === 11000 ? 409 : 500
+      return res.sendStatus(code)
     }
 
-    return res.sendStatus(200);
+    req.logIn(user, function(err) {
+      if (err) {
+        return res.sendStatus(500);
+      }
+
+      return res.sendStatus(200);
+    });
   });
 });
 
 app.get('/api/users/:userId', function(req, res) {
-  var user = _.find(fixtures.users, { id: req.params.userId });
+  User.findOne({ id: req.params.userId }, function(err, user) {
+    if (err) {
+      return res.sendStatus(500)
+    }
 
-  if (!user) {
-    return res.sendStatus(404)
+    if (!user) {
+      return res.sendStatus(404)
+    }
+
+    return res.send({ user: user });
+  })
+});
+
+app.put('/api/users/:userId', ensureAuthenticated, function(req, res) {
+
+  if (req.user.id !== req.params.userId) {
+    return res.sendStatus(403)
   }
 
-  return res.send({ user: user });
+  User.findOneAndUpdate({ id: req.user.id}, { password: req.body.password }, function(err, user) {
+
+    if (err) {
+      return res.sendStatus(500)
+    }
+
+    return res.send(200)
+  })
 });
 
 // Tweet Routes
 
 app.get('/api/tweets/:tweetId', function(req, res) {
-  var tweet = _.find(fixtures.tweets, { id: req.params.tweetId });
+  Tweet.findById(req.params.tweetId, function(err, tweet) {
+    if (err) {
+      return res.sendStatus(500)
+    }
+    
+    if (!tweet) {
+      return res.sendStatus(404)
+    }
 
-  if (!tweet) {
-    return res.sendStatus(404)
-  }
-
-  return res.send({ tweet: tweet });
+    return res.send({ tweet: tweet.toClient()})
+  })
 });
 
 app.post('/api/tweets', ensureAuthenticated, function(req, res) {
   var tweet = req.body.tweet
 
-  tweet.id = shortId.generate()
   tweet.created = Date.now() / 1000 | 0
   tweet.userId = req.user.id
 
-  fixtures.tweets.push(tweet)
-  return res.send({ tweet: tweet })
+  Tweet.create(tweet, function(err, tweet) {
+    if (err) {
+      var code = err.code === 11000 ? 409 : 500
+      return res.sendStatus(code)
+    }
+
+    res.send({ tweet: tweet.toClient() })
+  })
 });
 
 app.delete('/api/tweets/:tweetId', ensureAuthorized, function(req, res) {

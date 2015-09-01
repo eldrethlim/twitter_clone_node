@@ -1,20 +1,27 @@
 var passport = require('passport'),
     LocalStrategy = require('passport-local').Strategy,
     _ = require('lodash'),
-    fixtures = require('./fixtures')
+    fixtures = require('./fixtures'),
+    connection = require('./db'),
+    User = connection.model('User')
 
 var verify = function(username, password, done) {
-  var user = _.find(fixtures.users, { id: username })
+  var user = User.findOne({ id: username }, function(err, user) {
 
-  if (!user) {
-    return done(null, false, { message: 'Incorrect username.' })
-  }
-  if (user.password !== password) {
+    if (err) {
+      return done(err)
+    }
+    
+    if (!user) {
+      return done(null, false, { message: 'Incorrect username.' })
+    }
 
-    return done(null, false, { message: 'Incorrect password.' })
-  }
+    if (user.password !== password) {
+      return done(null, false, { message: 'Incorrect password' })
+    }
 
-  done(null, user)
+    done(null, user)
+  })
 };
 
 passport.use(new LocalStrategy(verify));
@@ -24,13 +31,7 @@ passport.serializeUser(function(user, done) {
 });
 
 passport.deserializeUser(function(id, done) {
-  var user = _.find(fixtures.users, { id: id })
-
-  if (!user) {
-    return done(null, false)
-  }
-
-  done(null, user)
+  User.findOne({ id: id }, done)
 });
 
 module.exports = passport;
