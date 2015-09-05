@@ -27,7 +27,7 @@ var verify = function(username, password, done) {
       }
     })
 
-    done(null, user)
+    done(null, user.toClient())
   })
 };
 

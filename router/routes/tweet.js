@@ -76,12 +76,20 @@ router.delete('/:tweetId', ensureAuthentication, function(req, res) {
 
 });
 
-router.get('/', function(req, res) {
-  if (!req.query.userId) {
+router.get('/', ensureAuthentication, function(req, res) {
+
+  if (req.query.stream === "profile_timeline" && req.query.userId) {
+
+    var query = { userId: req.query.userId}
+  } else if (req.query.stream === "home_timeline") {
+
+    var query = { userId: { $in: req.user.followingIds } }
+  } else {
+
     return res.sendStatus(400)
   }
 
-  Tweet.find({ userId: req.query.userId }, null, { sort: { text: 1 } }, function(err, tweets) {
+  Tweet.find(query, null, { sort: { created: -1 } }, function(err, tweets) {
     if (err) {
       return res.sendStatus(500)
     }
