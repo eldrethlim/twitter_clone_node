@@ -22,7 +22,6 @@
     "nconf": "^0.7.2",
     "passport": "^0.3.0",
     "passport-local": "^1.0.0",
-    "shortid": "^2.2.2",
     "supertest-session": "^1.0.0"
   },
   "devDependencies": {
